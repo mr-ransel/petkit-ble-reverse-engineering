@@ -9,7 +9,8 @@ Modes:
     (default)       Connect, auth, read all state — clean human-readable output
     --raw           Show raw BLE packet hex in addition to decoded values
     --json          Output as JSON (for scripting)
-    --self-init     Initialize the device with our own secret (DANGEROUS)
+    --self-init --confirm-permanent-init
+                    Initialize the device with our own secret (DANGEROUS)
 
 Usage:
     python probe.py              # read device state
@@ -227,7 +228,16 @@ async def main():
         "--self-init", action="store_true",
         help="Initialize device with our own secret (WRITES to device, dangerous)",
     )
+    parser.add_argument(
+        "--confirm-permanent-init", action="store_true",
+        help="Required with --self-init to acknowledge the permanent device write",
+    )
     args = parser.parse_args()
+
+    if args.self_init and not args.confirm_permanent_init:
+        parser.error("--self-init requires --confirm-permanent-init")
+    if args.confirm_permanent_init and not args.self_init:
+        parser.error("--confirm-permanent-init is only valid with --self-init")
 
     if args.raw:
         logging.basicConfig(level=logging.DEBUG)

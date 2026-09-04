@@ -80,7 +80,8 @@ FA FC FD <cmd:1> <type:1> <seq:1> <len_lo:1> <len_hi:1> [data:N] FB
 #### CMD 213 — Get Device ID
 - **Direction:** Request → Response
 - **Request payload:** (empty)
-- **Response payload:** 8 bytes deviceId (little-endian) + up to 14 bytes ASCII serial number
+- **Response payload:** 8 bytes deviceId (big-endian) + up to 14 bytes ASCII serial number
+- **Byte-order evidence:** The official app decodes this field with `ByteUtil.bytes2Long`, which shifts from the first byte to the last in big-endian order. The original zero-valued test device could not reveal this distinction.
 
 #### CMD 86 — Verify Secret
 - **Direction:** Request → Response
@@ -150,7 +151,8 @@ The `isLock` byte is only present on firmware versions that support it.
 #### CMD 66 — Get Battery/Voltage
 - **Direction:** Request → Response
 - **Request payload:** (empty)
-- **Response payload:** 2 bytes — little-endian raw voltage value
+- **Response payload:** At least 2 bytes — big-endian raw voltage value
+- A live CTW2 returned a third byte. Its W5 meaning is not yet confirmed; the official CTW3 parser treats the equivalent byte as battery percentage.
 - **Note:** This is a raw ADC value, not a calibrated percentage. Not a reliable water level indicator.
 
 #### CMD 215 — Get Extended Light Settings
@@ -163,7 +165,7 @@ The `isLock` byte is only present on firmware versions that support it.
 | 0 | lightConfig (1=config mode 1, else mode 2) |
 | 1 | number of time slots |
 | 2-5 | reserved (0) |
-| 6+ | Time slots: 5 bytes each (2B start_minutes_BE, 2B end_minutes_BE, 1B reserved) |
+| 6+ | Time slots: 5 bytes each (2B start_minutes_BE, 2B end_minutes_BE, 1B reserved/unknown; `0xFF` observed) |
 
 #### CMD 216 — Get Extended DND Settings
 - Same structure as CMD 215 but for Do Not Disturb schedules
@@ -241,7 +243,7 @@ This command is used for changing smart mode parameters, lamp/DND settings, and 
 - **CMD 73 (init)** — The probe script supports `--self-init` but it was intentionally avoided to keep the device uninitialized and accessible with zero-secret auth
 - **CMD 230 (push notifications)** — Device-initiated state updates; would need a long-running connection to observe
 - **CMD 83 (OTA)** — Firmware update trigger, intentionally not tested
-- **Extended settings (CMD 215/216)** — Read but not fully decoded in the probe script
+- **Extended settings:** CMD 215 has been read from the CTW2 but is not decoded by the reusable library; CMD 216 has not been live-tested
 - **Multi-device scenarios** — Only tested with one CTW2
 - **Initialized device with real secret** — Only zero-secret auth on an uninitialized device has been tested
 
@@ -259,7 +261,8 @@ The `probe_w5.py` script implements the read-only flow:
 python probe_w5.py              # Human-readable output
 python probe_w5.py --raw        # Include raw BLE packet hex
 python probe_w5.py --json       # Structured JSON output
-python probe_w5.py --self-init  # Initialize device (DANGEROUS, permanent)
+python probe_w5.py --self-init --confirm-permanent-init
+                              # Initialize device (DANGEROUS, permanent)
 ```
 
 Requires `bleak` (`pip install bleak`).

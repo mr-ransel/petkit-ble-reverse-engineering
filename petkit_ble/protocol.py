@@ -69,7 +69,8 @@ def decode_device_id(data: bytes) -> DeviceInfo:
     """Decode CMD 213 response."""
     info = DeviceInfo()
     if len(data) >= 8:
-        info.device_id = int.from_bytes(data[:8], "little")
+        # Matches the official app's ByteUtil.bytes2Long implementation.
+        info.device_id = int.from_bytes(data[:8], "big")
         info.initialized = info.device_id != 0
     if len(data) > 8:
         sn_bytes = data[8:min(22, len(data))]
@@ -136,7 +137,7 @@ def decode_battery(data: bytes) -> BatteryInfo:
     """Decode CMD 66 response."""
     if len(data) < 2:
         return BatteryInfo()
-    return BatteryInfo(voltage_raw=int.from_bytes(data[:2], "little"))
+    return BatteryInfo(voltage_raw=int.from_bytes(data[:2], "big"))
 
 
 def build_change_mode_payload(mode: int, submode: int = 0) -> bytes:

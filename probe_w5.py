@@ -9,7 +9,8 @@ Modes:
     (default)       Connect, auth, read all state — clean human-readable output
     --raw           Show raw BLE packet hex in addition to decoded values
     --json          Output as JSON (for scripting)
-    --self-init     Initialize the device with our own secret (DANGEROUS)
+    --self-init --confirm-permanent-init
+                    Initialize the device with our own secret (DANGEROUS)
 
 Usage:
     python probe_w5.py              # read device state
@@ -195,7 +196,7 @@ def decode_battery(data):
     if len(data) < 2:
         return {"raw": data.hex()}
     return {
-        "voltage_raw": int.from_bytes(data[:2], "little"),
+        "voltage_raw": int.from_bytes(data[:2], "big"),
         "raw": data.hex(),
     }
 
@@ -204,7 +205,8 @@ def decode_device_id(data):
     """Decode CMD 213 response."""
     result = {}
     if len(data) >= 8:
-        result["device_id"] = int.from_bytes(data[:8], "little")
+        # Matches the official app's ByteUtil.bytes2Long implementation.
+        result["device_id"] = int.from_bytes(data[:8], "big")
         result["initialized"] = result["device_id"] != 0
     if len(data) > 8:
         sn_bytes = data[8:min(22, len(data))]
@@ -504,9 +506,18 @@ async def main():
         "--self-init", action="store_true",
         help="Initialize device with our own secret (WRITES to device, dangerous)",
     )
+    parser.add_argument(
+        "--confirm-permanent-init", action="store_true",
+        help="Required with --self-init to acknowledge the permanent device write",
+    )
     args = parser.parse_args()
 
     _verbose = args.raw
+
+    if args.self_init and not args.confirm_permanent_init:
+        parser.error("--self-init requires --confirm-permanent-init")
+    if args.confirm_permanent_init and not args.self_init:
+        parser.error("--confirm-permanent-init is only valid with --self-init")
 
     if args.self_init:
         print("*" * 60)
